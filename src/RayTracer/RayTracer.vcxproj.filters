@@ -79,7 +79,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="readme.md" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

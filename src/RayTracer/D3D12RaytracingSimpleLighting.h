@@ -97,11 +97,11 @@ private:
         D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptorHandle;
     };
 
-    std::vector<D3DBuffer> m_index_buffers;
-    std::vector<D3DBuffer> m_vertex_buffers;
+    //std::vector<D3DBuffer> m_index_buffers;
+    //std::vector<D3DBuffer> m_vertex_buffers;
 
-    //D3DBuffer m_indexBuffer;
-    //D3DBuffer m_vertexBuffer;
+    D3DBuffer m_indexBuffer;
+    D3DBuffer m_vertexBuffer;
 
 	D3DBuffer m_instanceDataBuffer;
 

@@ -19,6 +19,8 @@ struct Mesh {
     std::string name;                    // Shape/mesh name from OBJ
     std::vector<Vertex> vertices;
     std::vector<Index> indices;
+	UINT32 vertexOffset;            // Offset in the vertex buffer
+	UINT32 indexOffset;             // Offset in the index buffer
     int materialId;                      // Single material ID for the entire mesh
 };
 

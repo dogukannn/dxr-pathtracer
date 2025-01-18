@@ -467,12 +467,17 @@ void D3D12RaytracingSimpleLighting::BuildGeometry()
 
 
 	//load obj file from assets/cornell-box.obj with mtls
+
+	std::vector<Vertex> all_vertices;
+	std::vector<Index> all_indices;
     
     if (loader.LoadModel("assets/cornell-box.obj")) {
 		auto& meshes = loader.GetMeshes();
     	auto& materials = loader.GetMaterials();
 		
 		// Process each mesh (each has one material)
+		UINT vertexOffset = 0;
+		UINT indexOffset = 0;
 		std::vector<InstanceData> instanceDatas;
 		for (auto& mesh : meshes) {
 			// Get the material for this mesh
@@ -482,7 +487,18 @@ void D3D12RaytracingSimpleLighting::BuildGeometry()
 			std::cout << "Material ID: " << mesh.materialId << std::endl;
 			std::cout << "Vertex count: " << mesh.vertices.size() << std::endl;
 
-			D3DBuffer vertexBuffer;
+			// Add the vertices and indices to the global list
+			all_vertices.insert(all_vertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+			all_indices.insert(all_indices.end(), mesh.indices.begin(), mesh.indices.end());
+
+			mesh.vertexOffset = vertexOffset;
+			mesh.indexOffset = indexOffset;
+
+            //update offsets
+			vertexOffset += mesh.vertices.size();
+			indexOffset += mesh.indices.size();
+
+			/*D3DBuffer vertexBuffer;
 			D3DBuffer indexBuffer;
 
 			AllocateUploadBuffer(device, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex), &vertexBuffer.resource);
@@ -494,18 +510,27 @@ void D3D12RaytracingSimpleLighting::BuildGeometry()
 			m_vertex_buffers.push_back(vertexBuffer);
 			m_index_buffers.push_back(indexBuffer);
 
-			ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index!");
+			ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index!");*/
 
 			InstanceData instanceData;
 			instanceData.color.x = material.diffuse[0];
 			instanceData.color.y = material.diffuse[1];
 			instanceData.color.z = material.diffuse[2];
+
+			instanceData.vertexOffset = mesh.vertexOffset;
+			instanceData.indexOffset = mesh.indexOffset;
+
 			instanceDatas.push_back(instanceData);
 		}
 
-		AllocateUploadBuffer(device, instanceDatas.data(), instanceDatas.size() * sizeof(InstanceData), &m_instanceDataBuffer.resource);
+		AllocateUploadBuffer(device, all_vertices.data(), all_vertices.size() * sizeof(Vertex), &m_vertexBuffer.resource);
+		AllocateUploadBuffer(device, all_indices.data(), all_indices.size() * sizeof(Index), &m_indexBuffer.resource);
 
-		CreateBufferSRV(&m_instanceDataBuffer, instanceDatas.size(), 0);
+		CreateBufferSRV(&m_indexBuffer, all_indices.size() / 2, 0);
+		CreateBufferSRV(&m_vertexBuffer, all_vertices.size(), sizeof(Vertex));
+
+		AllocateUploadBuffer(device, instanceDatas.data(), instanceDatas.size() * sizeof(InstanceData), &m_instanceDataBuffer.resource);
+		CreateBufferSRV(&m_instanceDataBuffer, instanceDatas.size() * sizeof(InstanceData) / 4, 0);
     }
 
 
@@ -552,17 +577,19 @@ void D3D12RaytracingSimpleLighting::BuildAccelerationStructures()
     // build geometry descs from meshes
 	std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC> bottomLevelBuildDescs;
 	std::vector<ComPtr<ID3D12Resource>> scratchResources;
-	for (size_t i = 0; i < m_vertex_buffers.size(); i++) {
+    //get meshes
+	auto meshes = loader.GetMeshes();
+	for (size_t i = 0; i < meshes.size(); i++) {
 
 		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geometryDesc.Triangles.IndexBuffer = m_index_buffers[i].resource->GetGPUVirtualAddress();
-		geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_index_buffers[i].resource->GetDesc().Width) / sizeof(Index);
+		geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress() + meshes[i].indexOffset * sizeof(Index);
+		geometryDesc.Triangles.IndexCount = meshes[i].indices.size();
 		geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
 		geometryDesc.Triangles.Transform3x4 = 0;
 		geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertex_buffers[i].resource->GetDesc().Width) / sizeof(Vertex);
-		geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertex_buffers[i].resource->GetGPUVirtualAddress();
+		geometryDesc.Triangles.VertexCount = meshes[i].vertices.size();
+		geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress() + meshes[i].vertexOffset * sizeof(Vertex);
 		geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 		geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
@@ -645,7 +672,7 @@ void D3D12RaytracingSimpleLighting::BuildAccelerationStructures()
     ComPtr<ID3D12Resource> instanceDescsRes;   
 	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
 
-	for (size_t i = 0; i < m_vertex_buffers.size(); i++) {
+	for (size_t i = 0; i < meshes.size(); i++) {
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		instanceDesc.InstanceID = static_cast<UINT>(i);
@@ -806,7 +833,7 @@ void D3D12RaytracingSimpleLighting::DoRaytracing()
     {
         descriptorSetCommandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
         // Set index and successive vertex buffer decriptor tables
-        //commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBuffer.gpuDescriptorHandle);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_raytracingOutputResourceUAVGpuDescriptor);
 		commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::InstanceDataBuffersSlot, m_instanceDataBuffer.gpuDescriptorHandle);
     };
@@ -879,15 +906,18 @@ void D3D12RaytracingSimpleLighting::ReleaseDeviceDependentResources()
     m_descriptorsAllocated = 0;
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
-	for (auto& buffer : m_vertex_buffers)
-	{
-		buffer.resource.Reset();
-	}
+	//for (auto& buffer : m_vertex_buffers)
+	//{
+	//	buffer.resource.Reset();
+	//}
 
-	for (auto& buffer : m_index_buffers)
-	{
-		buffer.resource.Reset();
-	}
+	//for (auto& buffer : m_index_buffers)
+	//{
+	//	buffer.resource.Reset();
+	//}
+
+	m_vertexBuffer.resource.Reset();
+	m_indexBuffer.resource.Reset();
 
     m_perFrameConstants.Reset();
     m_rayGenShaderTable.Reset();

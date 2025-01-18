@@ -103,7 +103,7 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
 
     //return g_cubeCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
-    InstanceData i = InstanceDatas.Load<InstanceData>(0);
+    InstanceData i = InstanceDatas.Load < InstanceData > (sizeof(InstanceData) * InstanceID());
 
     return float4(i.color, 1.0f) * g_sceneCB.lightDiffuseColor * fNDotL;
 }
@@ -130,7 +130,7 @@ void MyRaygenShader()
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
 
     //trace 3 more rays for supersampling
-    float3 rayDir2 = rayDir + float3(0.01f, 0.01f, 0.0f);
+    float3 rayDir2 = rayDir + float3(0.003f, 0.003f, 0.0f);
     RayDesc ray2;
     ray2.Origin = origin;
     ray2.Direction = rayDir2;
@@ -139,7 +139,7 @@ void MyRaygenShader()
     RayPayload payload2 = { float4(0, 0, 0, 0) , 2};
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray2, payload2);
 
-    float3 rayDir3 = rayDir + float3(-0.01f, -0.01f, 0.0f);
+    float3 rayDir3 = rayDir + float3(-0.003f, -0.003f, 0.0f);
     RayDesc ray3;
     ray3.Origin = origin;
     ray3.Direction = rayDir3;
@@ -158,41 +158,60 @@ void MyRaygenShader()
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     //adjust color from red to blue according to the instanceID(), max is 8
-    payload.color = float4(InstanceID() / 8.0f, 0.0f, 1.0f - InstanceID() / 8.0f, 0.0f);
-    return;
+    //payload.color = float4(InstanceID() / 8.0f, 0.0f, 1.0f - InstanceID() / 8.0f, 0.0f);
+    //return;
+//
+//
+    //payload.color = float4(1.0f, 0.0f, 0.0f, 0.0f);
+    //return;
 
+    InstanceData i = InstanceDatas.Load < InstanceData > (sizeof(InstanceData) * InstanceID());
 
-    payload.color = float4(1.0f, 0.0f, 0.0f, 0.0f);
-    return;
     float3 hitPosition = HitWorldPosition();
 
     // Get the base index of the triangle's first 16 bit index.
     uint indexSizeInBytes = 2;
     uint indicesPerTriangle = 3;
     uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
-    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+    uint baseIndex = (i.indexOffset * indexSizeInBytes) + PrimitiveIndex() * triangleIndexStride;
 
+    // adjust color from red to blue according to the index offset max is 72
+    //payload.color = float4(i.indexOffset / 72.0f, 0.0f, 1.0f - i.indexOffset / 72.0f, 0.0f);
     // Load up 3 16 bit indices for the triangle.
     const uint3 indices = Load3x16BitIndices(baseIndex);
 
 
     // Retrieve corresponding vertex normals for the triangle vertices.
     float3 vertexNormals[3] = { 
-        Vertices[indices[0]].normal, 
-        Vertices[indices[1]].normal, 
-        Vertices[indices[2]].normal 
+        Vertices[i.vertexOffset + indices[0]].normal, 
+        Vertices[i.vertexOffset + indices[1]].normal, 
+        Vertices[i.vertexOffset + indices[2]].normal 
+    };
+
+
+    float3 vertexPositions[3] = { 
+        Vertices[i.vertexOffset + indices[0]].position, 
+        Vertices[i.vertexOffset + indices[1]].position, 
+        Vertices[i.vertexOffset + indices[2]].position 
     };
 
     // Compute the triangle's normal.
     // This is redundant and done for illustration purposes 
     // as all the per-vertex normals are the same and match triangle's normal in this sample. 
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
+    float3 trianglePosition = HitAttribute(vertexPositions, attr);
+
+
+    //payload.color = float4(triangleNormal * i.color, 1.0f);
+    //return;
 
     float4 diffuseColor = CalculateDiffuseLighting(hitPosition, triangleNormal);
-    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+    float4 color =  diffuseColor;
+    //payload.color = float4((hitPosition) / 2.0f, 1.0f);
+    //payload.color = float4((triangleNormal + 1.0f) / 2.0f, 1.0f);
+    payload.color = color;
+    return;
 
-
-    InstanceData i = InstanceDatas.Load < InstanceData > (sizeof(InstanceData) * InstanceID());
 
     if (InstanceID() == 1)
     {

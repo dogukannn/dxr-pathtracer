@@ -45,6 +45,8 @@ struct Vertex
 struct InstanceData
 {
 	XMFLOAT3 color;
+	UINT vertexOffset;
+	UINT indexOffset;
 };
 
 

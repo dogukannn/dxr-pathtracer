@@ -76,6 +76,7 @@
       <CompileAsWinRT>false</CompileAsWinRT>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -112,6 +113,10 @@
       <Message>
       </Message>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>xcopy /E /I /Y "$(ProjectDir)assets" "$(OutDir)assets"
+if errorlevel 1 exit 1</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -158,11 +163,13 @@
     </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AssetLoader.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXRaytracingHelper.h" />
     <ClInclude Include="HlslCompat.h" />
     <ClInclude Include="RaytracingHlslCompat.h" />
     <ClInclude Include="StepTimer.h" />
+    <ClInclude Include="tiny_obj_loader.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="D3D12RaytracingSimpleLighting.h" />
     <ClInclude Include="d3dx12.h" />

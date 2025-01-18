@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include "AssetLoader.h"
 #include "DXSample.h"
 #include "StepTimer.h"
 #include "RaytracingHlslCompat.h"
@@ -73,30 +74,39 @@ private:
     // Root signatures
     ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
+    ComPtr<ID3D12RootSignature> m_raytracingSecondLocalRootSignature;
 
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
     UINT m_descriptorSize;
+
     
     // Raytracing scene
     SceneConstantBuffer m_sceneCB[FrameCount];
     CubeConstantBuffer m_cubeCB;
 
     // Geometry
+    ModelLoader loader;
+
+
     struct D3DBuffer
     {
         ComPtr<ID3D12Resource> resource;
         D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptorHandle;
         D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptorHandle;
     };
-    D3DBuffer m_indexBuffer;
-    D3DBuffer m_vertexBuffer;
+
+    std::vector<D3DBuffer> m_index_buffers;
+    std::vector<D3DBuffer> m_vertex_buffers;
+
+    //D3DBuffer m_indexBuffer;
+    //D3DBuffer m_vertexBuffer;
 
 	D3DBuffer m_instanceDataBuffer;
 
     // Acceleration structure
-    ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+	std::vector<ComPtr<ID3D12Resource>> m_bottomLevelAccelerationStructures;
     ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
 
     // Raytracing output
@@ -106,8 +116,10 @@ private:
 
     // Shader tables
     static const wchar_t* c_hitGroupName;
+    static const wchar_t* c_secondHitGroupName;
     static const wchar_t* c_raygenShaderName;
     static const wchar_t* c_closestHitShaderName;
+    static const wchar_t* c_secondClosestHitShaderName;
     static const wchar_t* c_missShaderName;
     ComPtr<ID3D12Resource> m_missShaderTable;
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;

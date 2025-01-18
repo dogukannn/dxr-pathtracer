@@ -157,6 +157,13 @@ void MyRaygenShader()
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
+    //adjust color from red to blue according to the instanceID(), max is 8
+    payload.color = float4(InstanceID() / 8.0f, 0.0f, 1.0f - InstanceID() / 8.0f, 0.0f);
+    return;
+
+
+    payload.color = float4(1.0f, 0.0f, 0.0f, 0.0f);
+    return;
     float3 hitPosition = HitWorldPosition();
 
     // Get the base index of the triangle's first 16 bit index.
@@ -210,6 +217,67 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     payload.color = color;
 }
+
+[shader("closesthit")]
+void MySecondClosestHitShader(inout RayPayload payload, in MyAttributes attr)
+{
+    payload.color = float4(1.0f, 0.0f, 0.0f, 0.0f);
+    return;
+    float3 hitPosition = HitWorldPosition();
+
+    // Get the base index of the triangle's first 16 bit index.
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+    // Load up 3 16 bit indices for the triangle.
+    const uint3 indices = Load3x16BitIndices(baseIndex);
+
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 vertexNormals[3] = { 
+        Vertices[indices[0]].normal, 
+        Vertices[indices[1]].normal, 
+        Vertices[indices[2]].normal 
+    };
+
+    // Compute the triangle's normal.
+    // This is redundant and done for illustration purposes 
+    // as all the per-vertex normals are the same and match triangle's normal in this sample. 
+    float3 triangleNormal = HitAttribute(vertexNormals, attr);
+
+    float4 diffuseColor = CalculateDiffuseLighting(hitPosition, triangleNormal);
+    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+
+
+    InstanceData i = InstanceDatas.Load < InstanceData > (sizeof(InstanceData) * InstanceID());
+
+    if (InstanceID() == 1)
+    {
+	    //mirror material
+        float3 normal = normalize(triangleNormal);
+        float3 incident = normalize(WorldRayDirection());
+        float3 reflection = reflect(incident, normal);
+        float3 reflectionOrigin = hitPosition + normal * 0.001f;
+        //scatter reflection ray a bit
+        //float nois = noise(0, 1);
+
+        reflection += float3(0.0f, 0.2f, 0.0f) * 0.1f;
+        RayDesc reflectionRay;
+        reflectionRay.Origin = reflectionOrigin;
+        reflectionRay.Direction = reflection;
+        reflectionRay.TMin = 0.001f;
+        reflectionRay.TMax = 10000.0f;
+        payload.recursion_depth--;
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, reflectionRay, payload);
+        color = payload.color * 0.5f;
+    }
+
+    payload.color = color;
+}
+
+
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)

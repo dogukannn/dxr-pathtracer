@@ -250,6 +250,7 @@ void DeviceResources::CreateWindowSizeDependentResources()
     {
         m_renderTargets[n].Reset();
         m_fenceValues[n] = m_fenceValues[m_backBufferIndex];
+        m_accum_buffers[n].Reset();
     }
 
     // Determine the render target size in pixels.
@@ -353,6 +354,34 @@ void DeviceResources::CreateWindowSizeDependentResources()
         m_d3dDevice->CreateRenderTargetView(m_renderTargets[n].Get(), &rtvDesc, rtvDescriptor);
     }
 
+	//Create UAV accum buffers
+	for (UINT n = 0; n < m_backBufferCount; n++)
+	{
+		CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, backBufferWidth, backBufferHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		D3D12_CLEAR_VALUE clearValue = {};
+		clearValue.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		clearValue.Color[0] = 0.0f;
+		clearValue.Color[1] = 0.0f;
+		clearValue.Color[2] = 0.0f;
+		clearValue.Color[3] = 0.0f;
+
+		ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+			&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			&clearValue,
+			IID_PPV_ARGS(&m_accum_buffers[n])
+		));
+
+		wchar_t name[25] = {};
+		swprintf_s(name, L"Accum buffer %u", n);
+		m_accum_buffers[n]->SetName(name);
+	}
+
+
     // Reset the index to the current back buffer.
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 
@@ -455,6 +484,7 @@ void DeviceResources::HandleDeviceLost()
     {
         m_commandAllocators[n].Reset();
         m_renderTargets[n].Reset();
+		m_accum_buffers[n].Reset();
     }
 
     m_depthStencil.Reset();

@@ -12,6 +12,15 @@
 #ifndef RAYTRACINGHLSLCOMPAT_H
 #define RAYTRACINGHLSLCOMPAT_H
 
+
+//define PAD_VAR for 16 byte alignment
+
+#define PAD_VAR UINT CONCAT(padding_, __COUNTER__);
+
+#define CONCAT(a, b) CONCAT_INNER(a, b)
+#define CONCAT_INNER(a, b) a##b
+
+
 #ifdef HLSL
 #include "HlslCompat.h"
 #else
@@ -28,6 +37,14 @@ struct SceneConstantBuffer
     XMVECTOR lightPosition;
     XMVECTOR lightAmbientColor;
     XMVECTOR lightDiffuseColor;
+    XMVECTOR random_floats;
+
+	float accumulative_frame_count;
+    UINT LightCount;
+    PAD_VAR;
+    PAD_VAR;
+
+    UINT LightMeshIndices[16];
 };
 
 struct CubeConstantBuffer
@@ -42,11 +59,30 @@ struct Vertex
 	XMFLOAT2 texCoord;
 };
 
+enum BRDFType : UINT
+{
+    Phong = 0,
+	BlinnPhong = 1,
+};
+
 struct InstanceData
 {
-	XMFLOAT3 color;
+    XMFLOAT3 color;
+    float exponent;
+
+	XMFLOAT3 kd;
+	UINT brdfType;
+
+    XMFLOAT3 ks;
 	UINT vertexOffset;
+
 	UINT indexOffset;
+	UINT cdfOffset;
+	UINT triangleCount;
+    UINT is_emissive;
+
+    float totalArea;
+    XMFLOAT3 emission;
 };
 
 

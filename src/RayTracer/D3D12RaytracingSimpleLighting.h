@@ -16,6 +16,8 @@
 #include "StepTimer.h"
 #include "RaytracingHlslCompat.h"
 
+#define MAX_RECURSION_DEPTH 6
+
 namespace GlobalRootSignatureParams {
     enum Value {
         OutputViewSlot = 0,
@@ -23,6 +25,7 @@ namespace GlobalRootSignatureParams {
         SceneConstantSlot,
         VertexBuffersSlot,
         InstanceDataBuffersSlot,
+        CDFBuffersSlot,
         Count 
     };
 }
@@ -64,7 +67,7 @@ public:
     virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
 
 private:
-    static const UINT FrameCount = 3;
+    static const UINT FrameCount = 2;
 
     // We'll allocate space for several of these and they will need to be padded for alignment.
     static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here.");
@@ -121,6 +124,7 @@ private:
 
     D3DBuffer m_indexBuffer;
     D3DBuffer m_vertexBuffer;
+    D3DBuffer m_cdfBuffer;
 
 	D3DBuffer m_instanceDataBuffer;
 

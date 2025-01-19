@@ -12,6 +12,7 @@ struct Material {
     float ambient[3];
     float diffuse[3];
     float specular[3];
+    float emission[3];
     float shininess;
     std::string diffuseTexture;
 };
@@ -22,6 +23,7 @@ struct Mesh {
     std::vector<Index> indices;
 	UINT32 vertexOffset;            // Offset in the vertex buffer
 	UINT32 indexOffset;             // Offset in the index buffer
+	UINT32 cdfOffset;             // Offset in the index buffer
     int materialId;                      // Single material ID for the entire mesh
 };
 
@@ -75,6 +77,7 @@ private:
                 material.ambient[i] = mat.ambient[i];
                 material.diffuse[i] = mat.diffuse[i];
                 material.specular[i] = mat.specular[i];
+				material.emission[i] = mat.emission[i];
             }
             
             material.shininess = mat.shininess;

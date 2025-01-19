@@ -33,6 +33,7 @@ typedef UINT16 Index;
 struct SceneConstantBuffer
 {
     XMMATRIX projectionToWorld;
+
     XMVECTOR cameraPosition;
     XMVECTOR lightPosition;
     XMVECTOR lightAmbientColor;
@@ -44,7 +45,11 @@ struct SceneConstantBuffer
     PAD_VAR;
     PAD_VAR;
 
-    UINT LightMeshIndices[16];
+#ifdef HLSL
+    uint4 LightMeshIndices[4];
+#else
+	UINT LightMeshIndices[16];
+#endif
 };
 
 struct CubeConstantBuffer

@@ -172,10 +172,11 @@ float3 SamplePointOnMesh(in InstanceData mesh, in float3 seed)
 	float2 rand = random2D(seed);
     float cdf_random = hash(rand.x * rand.y * 23.23243f);
 
-    for(uint i = 0; i < triangleCount; i++)
+    //for(uint i = 0; i < triangleCount; i++)
     {
-        float cdf = CDFBuffer.Load <float> ((mesh.cdfOffset * 4) + i * 4);
-        if(cdf_random <= cdf)
+        //float cdf = CDFBuffer.Load <float> ((mesh.cdfOffset * 4) + i * 4);
+        //if(cdf_random <= cdf)
+        uint i = (float)triangleCount * rand;
         {
     // Get the base index of the triangle's first 16 bit index.
     //uint indexSizeInBytes = 2;
@@ -202,9 +203,9 @@ float3 SampleLights(InstanceData mesh, float3 p, float3 n, float3 r_direction, f
 {
     seed += (p + n + r_direction) * 1229.0f;
     float3 res = float3(0, 0, 0);
-    for (int i = 0; i < g_sceneCB.LightCount; i++)
+    for (uint i = 0; i < g_sceneCB.LightCount; i++)
     {
-	    InstanceData light = InstanceDatas.Load<InstanceData>(sizeof(InstanceData) * g_sceneCB.LightMeshIndices[i]);
+        InstanceData light = InstanceDatas.Load < InstanceData > (sizeof(InstanceData) * g_sceneCB.LightMeshIndices[i / 4][i % 4]);
 
         float3 sampled_point = SamplePointOnMesh(light, seed);
         float A = light.totalArea;

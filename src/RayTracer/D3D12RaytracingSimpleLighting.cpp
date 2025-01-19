@@ -143,19 +143,6 @@ void D3D12RaytracingSimpleLighting::InitializeScene()
 
 	m_sceneCB[frameIndex].accumulative_frame_count = 0.0;
 
-	//init light meshes and their indices
-	int light_count = 0;
-	auto& meshes = loader.GetMeshes();
-	auto& materials = loader.GetMaterials();
-	for (auto& mesh : meshes)
-	{
-		auto mat = materials[mesh.materialId];
-		if (mat.name == "Light")
-		{
-			m_sceneCB[frameIndex].LightMeshIndices[light_count] = mesh.materialId;
-			light_count++;
-		}
-	}
 
     // Apply the initial values to all frames' buffer instances.
     for (auto& sceneCB : m_sceneCB)
@@ -507,7 +494,7 @@ void D3D12RaytracingSimpleLighting::BuildGeometry()
 	std::vector<Index> all_indices;
     std::vector<float> mesh_cdfs;
     
-    if (loader.LoadModel("assets/cornell-box-tourus.obj")) {
+    if (loader.LoadModel("assets/cornell-box-heart.obj")) {
 		auto& meshes = loader.GetMeshes();
     	auto& materials = loader.GetMaterials();
 		
@@ -622,7 +609,7 @@ void D3D12RaytracingSimpleLighting::BuildGeometry()
 		}
         i++;
 	}
-    m_sceneCB->LightCount = light_count;
+    m_sceneCB[frameIndex].LightCount = light_count;
 
     // Apply the initial values to all frames' buffer instances.
     for (auto& sceneCB : m_sceneCB)

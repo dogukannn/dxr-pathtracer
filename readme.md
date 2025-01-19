@@ -3,12 +3,12 @@
 Path Tracer implementation using DXR
 
 - [ ] Model Loading From XML Files
-- [ ] Material System
-- [ ] Path Tracing
-- [ ] Next Event Estimation
-- [ ] Importance Sampling
-- [ ] Russian Roulette
-- [ ] Splitting
+- [x] Material System
+- [x] Path Tracing
+- [x] Next Event Estimation
+- [x] Importance Sampling
+- [x] Russian Roulette
+- [x] Splitting
 
 ##### Rendering
 Each frame render happens in the sample's OnRender() call and includes executing DispatchRays() with a 2D grid dimensions matching that of backbuffer resolution and copying of the raytraced result to the backbuffer before finally presenting the it to the screen. The sample implements three shaders: *ray generation*, *closest hit* and *miss* shader: 

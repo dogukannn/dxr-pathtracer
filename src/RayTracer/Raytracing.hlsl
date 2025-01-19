@@ -119,6 +119,7 @@ struct RayPayload
     int recursion_depth;
     UINT is_shadow_ray;
     UINT is_indirect_ray;
+    float potential;
 };
 
 // Retrieve hit world position.
@@ -169,7 +170,7 @@ float3 SamplePointOnMesh(in InstanceData mesh, in float3 seed)
     uint triangleCount = mesh.triangleCount;
 	
 	float2 rand = random2D(seed);
-    float cdf_random = hash(rand.x * rand.y * 20123424.0f);
+    float cdf_random = hash(rand.x * rand.y * 23.23243f);
 
     for(uint i = 0; i < triangleCount; i++)
     {
@@ -284,10 +285,11 @@ void MyRaygenShader()
         ray.TMin = 0.001; // Avoid aliasing issues.
         ray.TMax = 10000.0; // Set maximum ray extent.
 
-        RayPayload payload = { float4(0, 0, 0, 0), 6, 0, 0};
+        RayPayload payload = { float4(0, 0, 0, 0), 6, 0, 0, 0};
         payload.recursion_depth = 6;
         payload.is_shadow_ray = 0;
         payload.is_indirect_ray = 0;
+        payload.potential = 0.99f;
 
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
 
@@ -393,14 +395,36 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     //float3 SampleLights(InstanceData mesh, float3 p, float3 n, float3 r_direction, float3 seed)
     float3 nee_light_sample = SampleLights(i, hitPosition, triangleNormal, WorldRayDirection(), (hitPosition * g_sceneCB.random_floats[0] + triangleNormal) * g_sceneCB.random_floats[3]);
 
+
+
+    const int splitting_factor = 2;
     // Generate three random directions for scattering
-    float3 scatterDirections[5];
-    for (int j = 0; j < 5; j++) {
+    float3 scatterDirections[splitting_factor];
+    for (int j = 0; j < splitting_factor; j++) {
         scatterDirections[j] = randomInHemisphere(triangleNormal, float3(hitPosition + triangleNormal * j * 4.33253f));
     }
 
+    float factor = 1.0f;
+
+    float3 kd = i.color;
+    float max_diffuse = max(kd.r, max(kd.g, kd.b));
+    float potential = payload.potential * max_diffuse;
+    potential = clamp(potential, 0.0f, 0.99f);
+
+    {
+        if (hash(g_sceneCB.random_floats[1] * (hitPosition.x + hitPosition.y + hitPosition.z) + 0.234354f + triangleNormal.y) > potential)
+        {
+            payload.color += float4(nee_light_sample, 0.0f); // Add accumulated color to the payload
+            return;
+        }
+        else
+        {
+            factor = 1.0f / (potential);
+        }
+    }
+
     // Trace each scattered ray and accumulate radiance
-    for (int j = 0; j < 2; j++) {
+    for (int j = 0; j < splitting_factor; j++) {
         RayDesc scatterRay;
         scatterRay.Origin = hitPosition + triangleNormal * 0.001;  // Offset to avoid self-intersection
         scatterRay.Direction = scatterDirections[j];
@@ -412,6 +436,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         scatterPayload.recursion_depth = payload.recursion_depth;
         scatterPayload.is_shadow_ray = 0;
         scatterPayload.is_indirect_ray = 1;
+        scatterPayload.potential = potential;
         TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 1, 0, scatterRay, scatterPayload);
 
         float3 wi = normalize(scatterRay.Direction);
@@ -436,13 +461,13 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         //float3 brdf = diffuse + specular;
 
         //accumulatedColor += (intensity * brdf * (3.14)) / 5.0; // Divide by 3 to average contributions
-        accumulatedColor += (intensity * brdf * pi); // Divide by 3 to average contributions
+        accumulatedColor += (intensity * brdf * pi) * factor; // Divide by 3 to average contributions
         //accumulatedColor += (intensity * kd); // Divide by 3 to average contributions
 
         //accumulatedColor += scatterPayload.color * brdf * (6.28) / 5.0; // Divide by 3 to average contributions
     }
 
-    payload.color += float4(accumulatedColor / 2.0f, 1.0f) + float4(nee_light_sample, 0.0f); // Add accumulated color to the payload
+    payload.color += float4(accumulatedColor / (float)splitting_factor, 1.0f) + float4(nee_light_sample, 0.0f); // Add accumulated color to the payload
     //payload.color += float4(accumulatedColor / 2.0f, 1.0f); // Add accumulated color to the payload
     return;
 

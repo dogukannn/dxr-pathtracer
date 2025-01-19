@@ -93,7 +93,7 @@ void D3D12RaytracingSimpleLighting::InitializeScene()
     {
         // Initialize the view and projection inverse matrices.
         m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
-        m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
+        m_at = { 0.0f, 2.0f, -4.0f, 1.0f };
         XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 
         XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
@@ -787,12 +787,12 @@ void D3D12RaytracingSimpleLighting::OnUpdate()
 
     // Rotate the camera around Y axis.
     {
-        float secondsToRotateAround = 24.0f;
-        float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-        m_eye = XMVector3Transform(m_eye, rotate);
-        m_up = XMVector3Transform(m_up, rotate);
-        m_at = XMVector3Transform(m_at, rotate);
+        //float secondsToRotateAround = 24.0f;
+        //float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+        //XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
+        //m_eye = XMVector3Transform(m_eye, rotate);
+        //m_up = XMVector3Transform(m_up, rotate);
+        //m_at = XMVector3Transform(m_at, rotate);
         UpdateCameraMatrices();
     }
 
@@ -966,6 +966,127 @@ void D3D12RaytracingSimpleLighting::OnDestroy()
     // Let GPU finish before releasing D3D resources.
     m_deviceResources->WaitForGpu();
     OnDeviceLost();
+}
+
+void D3D12RaytracingSimpleLighting::OnKeyDown(UINT8 key)
+{
+    // Get the actual forward direction from eye to at (including vertical component)
+    XMVECTOR forward = XMVector3Normalize(m_at - m_eye);
+    
+    // Calculate right vector using world up
+    XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR right = XMVector3Normalize(XMVector3Cross(forward, worldUp));
+    
+    const float maxSpeed = 10.0f;
+    XMVECTOR desiredVelocity = XMVectorZero();
+
+    switch (key)
+    {
+    case 'W':
+        desiredVelocity = forward;
+        break;
+    case 'S':
+        desiredVelocity = XMVectorNegate(forward);
+        break;
+    case 'A':
+        desiredVelocity = right;
+        break;
+    case 'D':
+        desiredVelocity = XMVectorNegate(right);
+        break;
+    }
+
+    if (!XMVector3Equal(desiredVelocity, XMVectorZero()))
+    {
+        // Accelerate towards desired velocity
+        desiredVelocity = XMVectorScale(desiredVelocity, maxSpeed);
+        XMVECTOR acceleration = XMVectorScale(
+            desiredVelocity - m_currentVelocity,
+            m_acceleration * m_deltaTime
+        );
+        m_currentVelocity = m_currentVelocity + acceleration;
+
+        // Clamp to max speed
+        float currentSpeed = XMVectorGetX(XMVector3Length(m_currentVelocity));
+        if (currentSpeed > maxSpeed)
+        {
+            m_currentVelocity = XMVectorScale(
+                XMVector3Normalize(m_currentVelocity),
+                maxSpeed
+            );
+        }
+    }
+    else
+    {
+        // Decelerate when no input
+        float currentSpeed = XMVectorGetX(XMVector3Length(m_currentVelocity));
+        if (currentSpeed > 0.0f)
+        {
+            float newSpeed = max(0.0f, currentSpeed - m_deceleration * m_deltaTime);
+            if (currentSpeed > 0.0f)
+            {
+                m_currentVelocity = XMVectorScale(
+                    XMVector3Normalize(m_currentVelocity),
+                    newSpeed
+                );
+            }
+            else
+            {
+                m_currentVelocity = XMVectorZero();
+            }
+        }
+    }
+
+    // Apply velocity to position
+    XMVECTOR movement = XMVectorScale(m_currentVelocity, m_deltaTime);
+    m_eye = XMVectorAdd(m_eye, movement);
+    m_at = XMVectorAdd(m_at, movement);
+    
+    UpdateCameraMatrices();
+}
+void D3D12RaytracingSimpleLighting::OnMouseMove(UINT x, UINT y)
+{
+    if (!m_rightMouseDown)
+        return;
+
+    const float sensitivity = 0.2f;
+    float yaw = XMConvertToRadians(sensitivity * static_cast<float>((INT)x - m_mouseDrag.x));
+    float pitch = XMConvertToRadians(sensitivity * static_cast<float>((INT)y - m_mouseDrag.y));
+
+    // Get the look vector and its length
+    XMVECTOR lookVector = m_at - m_eye;
+    float lookLength = XMVectorGetX(XMVector3Length(lookVector));
+    lookVector = XMVector3Normalize(lookVector);
+
+    // Apply yaw rotation (around world up)
+    XMMATRIX yawMatrix = XMMatrixRotationY(yaw);
+    lookVector = XMVector3Transform(lookVector, yawMatrix);
+
+    // Apply pitch rotation (around local right)
+    XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR right = XMVector3Cross(lookVector, worldUp);
+    right = XMVector3Normalize(right);
+    XMMATRIX pitchMatrix = XMMatrixRotationAxis(right, -pitch);
+    lookVector = XMVector3Transform(lookVector, pitchMatrix);
+
+    // Update at point
+    m_at = m_eye + XMVectorScale(lookVector, lookLength);
+    
+    m_mouseDrag.x = x;
+    m_mouseDrag.y = y;
+
+    UpdateCameraMatrices();
+}
+void D3D12RaytracingSimpleLighting::OnLeftButtonDown(UINT x, UINT y)
+{
+    m_rightMouseDown = true;
+    m_mouseDrag.x = x;
+    m_mouseDrag.y = y;
+}
+
+void D3D12RaytracingSimpleLighting::OnLeftButtonUp(UINT x, UINT y)
+{
+    m_rightMouseDown = false;
 }
 
 // Release all device dependent resouces when a device is lost.

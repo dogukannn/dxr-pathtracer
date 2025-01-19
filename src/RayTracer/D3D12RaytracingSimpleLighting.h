@@ -34,6 +34,13 @@ namespace LocalRootSignatureParams {
     };
 }
 
+//struct for handling mouse drag
+struct MouseDrag
+{
+	bool active;
+	INT x;
+	INT y;
+};
 
 class D3D12RaytracingSimpleLighting : public DXSample
 {
@@ -50,6 +57,10 @@ public:
     virtual void OnRender();
     virtual void OnSizeChanged(UINT width, UINT height, bool minimized);
     virtual void OnDestroy();
+	virtual void OnKeyDown(UINT8 key) override;
+    virtual void OnMouseMove(UINT x, UINT y) override;
+    virtual void OnLeftButtonDown(UINT x, UINT y) override;
+	virtual void OnLeftButtonUp(UINT x, UINT y) override;
     virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
 
 private:
@@ -88,6 +99,14 @@ private:
 
     // Geometry
     ModelLoader loader;
+
+    // Mouse drag
+	MouseDrag m_mouseDrag;
+	XMVECTOR m_currentVelocity = XMVectorZero();
+	float m_acceleration = 20.0f;      // Units per second squared
+	float m_deceleration = 10.0f;      // Units per second squared
+	float m_deltaTime = 0.016f;        // Assuming 60 FPS, update this with actual frame time
+	bool m_rightMouseDown = false;
 
 
     struct D3DBuffer

@@ -8,6 +8,7 @@
 
 
 struct Material {
+    std::string name;
     float ambient[3];
     float diffuse[3];
     float specular[3];
@@ -78,6 +79,7 @@ private:
             
             material.shininess = mat.shininess;
             material.diffuseTexture = mat.diffuse_texname;
+            material.name = mat.name;
             
             loadedMaterials.push_back(material);
         }
